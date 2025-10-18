@@ -12,23 +12,31 @@ try {
 }
 const moment = require('moment-timezone');
 const sqlite3 = require('sqlite3').verbose();
-const { open } = require('sqlite');
+const path = require('path');
+const fs = require('fs');
 
 const TOKEN = process.env.DISCORD_TOKEN;
 const GUILD_ID = process.env.GUILD_ID;
 const SERVER_TZ = process.env.TIMEZONE || 'Asia/Kolkata';
 
+// Ensure data directory exists
+const dataDir = path.join(__dirname, 'data');
+if (!fs.existsSync(dataDir)) {
+  fs.mkdirSync(dataDir, { recursive: true });
+}
+
 // Initialize database
-let db;
-(async () => {
-  try {
-    db = await open({
-      filename: './data/scrims.sqlite',
-      driver: sqlite3.Database
-    });
-    
-    // Create tables if they don't exist
-    await db.exec(`
+const db = new sqlite3.Database(path.join(dataDir, 'scrims.sqlite'), (err) => {
+  if (err) {
+    console.error('Error opening database:', err);
+    process.exit(1);
+  }
+  
+  console.log('Connected to SQLite database');
+  
+  // Create tables if they don't exist
+  db.serialize(() => {
+    db.run(`
       CREATE TABLE IF NOT EXISTS teams (
         team_name TEXT PRIMARY KEY,
         team_tag TEXT,
@@ -40,30 +48,64 @@ let db;
         player3_name TEXT,
         substitute_id TEXT,
         substitute_name TEXT
-      );
-      
+      )
+    `);
+    
+    db.run(`
       CREATE TABLE IF NOT EXISTS scrims (
         scrim_name TEXT PRIMARY KEY,
         start_time TEXT,
         end_time TEXT,
         mention_role_id TEXT,
         day_of_week TEXT
-      );
-      
+      )
+    `);
+    
+    db.run(`
       CREATE TABLE IF NOT EXISTS daily_registration (
         scrim_name TEXT,
         team_name TEXT,
         checked_in INTEGER,
         PRIMARY KEY(scrim_name, team_name)
-      );
+      )
     `);
     
-    console.log('Database connected successfully');
-  } catch (error) {
-    console.error('Failed to initialize database:', error);
-    process.exit(1);
-  }
-})();
+    console.log('Database tables verified/created');
+  });
+});
+
+// Helper function to promisify db.get
+function dbGet(query, params = []) {
+  return new Promise((resolve, reject) => {
+    db.get(query, params, (err, row) => {
+      if (err) reject(err);
+      else resolve(row);
+    });
+  });
+}
+
+// Helper function to promisify db.all
+function dbAll(query, params = []) {
+  return new Promise((resolve, reject) => {
+    db.all(query, params, (err, rows) => {
+      if (err) reject(err);
+      else resolve(rows);
+    });
+  });
+}
+
+// Helper function to promisify db.run
+function dbRun(query, params = []) {
+  return new Promise((resolve, reject) => {
+    db.run(query, params, function(err) {
+      if (err) reject(err);
+      else resolve({ lastID: this.lastID, changes: this.changes });
+    });
+  });
+}
+
+// Make db and helpers available globally
+module.exports = { db, dbGet, dbAll, dbRun };
 
 // --- Health check server for Render ---
 const http = require('http');
@@ -94,9 +136,7 @@ const client = new Client({
 // In-memory captcha map: key = `${userId}|${scrimName}` -> expected word
 const captchaMap = {};
 
-// Database will be initialized by db.js
-const db = await getDb();
-console.log('Database initialized');
+// Database is already initialized at the top of the file
 
 // Helpers
 function parseMentionIds(input) {
