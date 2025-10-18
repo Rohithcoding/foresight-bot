@@ -10,13 +10,60 @@ try {
 } catch (e) {
   console.warn('Canvas module not available. Leaderboard functionality will be disabled.');
 }
+const moment = require('moment-timezone');
 const sqlite3 = require('sqlite3').verbose();
 const { open } = require('sqlite');
-const moment = require('moment-timezone');
 
 const TOKEN = process.env.DISCORD_TOKEN;
 const GUILD_ID = process.env.GUILD_ID;
 const SERVER_TZ = process.env.TIMEZONE || 'Asia/Kolkata';
+
+// Initialize database
+let db;
+(async () => {
+  try {
+    db = await open({
+      filename: './data/scrims.sqlite',
+      driver: sqlite3.Database
+    });
+    
+    // Create tables if they don't exist
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS teams (
+        team_name TEXT PRIMARY KEY,
+        team_tag TEXT,
+        captain_id TEXT,
+        captain_name TEXT,
+        player2_id TEXT,
+        player2_name TEXT,
+        player3_id TEXT,
+        player3_name TEXT,
+        substitute_id TEXT,
+        substitute_name TEXT
+      );
+      
+      CREATE TABLE IF NOT EXISTS scrims (
+        scrim_name TEXT PRIMARY KEY,
+        start_time TEXT,
+        end_time TEXT,
+        mention_role_id TEXT,
+        day_of_week TEXT
+      );
+      
+      CREATE TABLE IF NOT EXISTS daily_registration (
+        scrim_name TEXT,
+        team_name TEXT,
+        checked_in INTEGER,
+        PRIMARY KEY(scrim_name, team_name)
+      );
+    `);
+    
+    console.log('Database connected successfully');
+  } catch (error) {
+    console.error('Failed to initialize database:', error);
+    process.exit(1);
+  }
+})();
 
 // --- Health check server for Render ---
 const http = require('http');
@@ -47,41 +94,9 @@ const client = new Client({
 // In-memory captcha map: key = `${userId}|${scrimName}` -> expected word
 const captchaMap = {};
 
-// Initialize DB
-let db;
-(async () => {
-        
-  // --- Render-compatible database path ---
-const dbPath = process.env.DB_PATH || './scrims.sqlite';
-db = await open({ filename: dbPath, driver: sqlite3.Database });
-// --- End DB patch ---
-
-  await db.exec(`CREATE TABLE IF NOT EXISTS teams (
-    team_name TEXT PRIMARY KEY,
-    team_tag TEXT,
-    captain_id TEXT,
-    captain_name TEXT,
-    player2_id TEXT,
-    player2_name TEXT,
-    player3_id TEXT,
-    player3_name TEXT,
-    substitute_id TEXT,
-    substitute_name TEXT
-  );`);
-  await db.exec(`CREATE TABLE IF NOT EXISTS scrims (
-    scrim_name TEXT PRIMARY KEY,
-    start_time TEXT,
-    end_time TEXT,
-    mention_role_id TEXT,
-    day_of_week TEXT
-  );`);
-  await db.exec(`CREATE TABLE IF NOT EXISTS daily_registration (
-    scrim_name TEXT,
-    team_name TEXT,
-    checked_in INTEGER,
-    PRIMARY KEY(scrim_name, team_name)
-  );`);
-})();
+// Database will be initialized by db.js
+const db = await getDb();
+console.log('Database initialized');
 
 // Helpers
 function parseMentionIds(input) {
