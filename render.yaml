@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: farlight-scrims-bot
+    env: node
+    buildCommand: npm install
+    startCommand: node index.js
+    envVars:
+      - key: DISCORD_TOKEN
+        required: true
+        description: Your Discord bot token
+      - key: GUILD_ID
+        required: true
+        description: Your Discord server ID
+      - key: TIMEZONE
+        value: Asia/Kolkata
+        description: Server timezone
+    plan: free

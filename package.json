@@ -1,0 +1,27 @@
+{
+  "name": "farlight84-scrims-bot",
+  "version": "1.0.0",
+  "description": "Farlight 84 Scrims Manager - Discord bot",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node index.js",
+    "deploy": "node deploy-commands.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.15.3",
+    "moment-timezone": "^0.5.45",
+    "sqlite3": "^5.1.6",
+    "dotenv": "^16.3.1"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/farlight-scrims-bot.git"
+  },
+  "keywords": ["discord", "bot", "farlight84", "scrims"],
+  "author": "",
+  "license": "MIT"
+}
